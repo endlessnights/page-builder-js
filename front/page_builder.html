@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>jQuery UI Sortable - Connect lists</title>
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <link rel="stylesheet" href="/resources/demos/style.css">
+  <style>
+  #pb-components, #pb-container {
+    border: 1px solid grey;
+    width: 10%;
+    min-height: 20px;
+    list-style-type: none;
+    margin: 0;
+    padding: 5px 0 0 0;
+    float: left;
+  }
+  #pb-container {
+    border: 1px solid grey;
+    width: 85%;
+    min-height: 20px;
+    list-style-type: none;
+    margin: 0;
+    padding: 5px 0 0 0;
+    float: right;
+    margin-right: 30px;
+  }
+  #pb-container li, #sortable2 li {
+    margin: 0 5px 5px 5px;
+    padding: 5px;
+    font-size: 1.2em;
+    width: 98%;
+  }
+  .pb-button{
+  background-color: #4CAF50; /* Green */
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin:5px;
+  border-radius:5px;
+  }
+  </style>
+  <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+<div style="display: flex;flex-direction:column;" id="pb-components" class="connectedSortable">
+  {% for value, label in choices %}
+  <li class="pb-button" data-component-type="{{ value }}">{{ label }}</li>
+  {% endfor %}
+</div>
+
+<ul id="pb-container" class="connectedSortable">
+  <!-- Placeholder for the components in the right column -->
+  {% for component in components %}
+    <li class="pb-button" data-component-type="{{ component.component_type }}" data-component-id="{{ component.id }}">{{ component.content }}</li>
+  {% endfor %}
+</ul>
+  <script>
+  $(function() {
+    // Sortable setup
+    $("#pb-components, #pb-container").sortable({
+      connectWith: ".connectedSortable",
+      receive: function(event, ui) {
+        // Clone the dragged item
+        var clone = ui.item.clone();
+
+        // Check if the sender is the first column
+        if (ui.sender.attr("id") === "pb-components") {
+          // Set in_container=true for the dragged item (first column to second column)
+          var componentId = clone.data("component-id");
+          clone.attr("data-in-container", "true");
+
+          // Update the corresponding model instance's in_container field to True
+          $("#pb-container li[data-component-id='" + componentId + "']").data("in-container", "true");
+        }
+
+        // Add the clone to the container list (right column)
+        $(this).append(clone);
+
+        // Cancel the original sorting operation to prevent moving
+        ui.sender.sortable("cancel");
+
+        // Save the components using AJAX after the reorder
+        saveComponents();
+      }
+    });
+
+    // Function to save components using AJAX
+    function saveComponents() {
+      var components = [];
+      $("#pb-container li").each(function(index) {
+        var type = $(this).data('component-type');
+        var content = $(this).text();
+        var id = $(this).data('component-id');
+        var inContainer = $(this).data('in-container') === "true"; // Convert string to boolean
+
+        components.push({ type: type, content: content, order: index, id: id, in_container: inContainer });
+      });
+
+      $.ajax({
+        type: "POST",
+        url: "{% url 'save_components' %}",
+        data: {
+          components: JSON.stringify(components),
+          csrfmiddlewaretoken: '{{ csrf_token }}'
+        },
+        success: function(data) {
+          // Handle the success response if needed
+          console.log("Components saved successfully.");
+        },
+        error: function(xhr, textStatus, errorThrown) {
+          // Handle any error that occurred during the AJAX request
+          console.error("Error saving components:", textStatus, errorThrown);
+        }
+      });
+    }
+  });
+</script>
+  </body>
+</html>
